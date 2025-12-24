@@ -6,7 +6,18 @@ import { Experience } from './components/Experience';
 import { UIOverlay } from './components/UIOverlay';
 import { GestureController } from './components/GestureController';
 import { TreeMode } from './types';
-import bg6 from './backgrounds/6.jpg'; // 直接 import 静态资源，打包时自动处理路径
+
+// ✅ 终极路径生成器：兼容本地与 GitHub Pages（读取 vite.config.ts 的 base）
+const getPublicAsset = (path: string) => `${import.meta.env.BASE_URL}${path}`;
+
+// 默认本地照片（已放入 public/images，下方按文件名列出）
+const defaultPhotoFiles = [
+  'photo01.JPG', 'photo02.JPG', 'photo03.JPG', 'photo04.JPG', 'photo05.JPG', 'photo06.JPG',
+  'photo07.JPG', 'photo08.JPG', 'photo09.JPG', 'photo10.jpg', 'photo11.jpg', 'photo12.jpg',
+  'photo13.jpg', 'photo14.jpg', 'photo15.jpg', 'photo16.jpg', 'photo17.jpg', 'photo18.jpg',
+  'photo19.jpg', 'photo20.jpg', 'photo21.jpg', 'photo22.jpg', 'photo23.jpg', 'photo24.jpg',
+  'photo25.jpg', 'photo26.jpg', 'photo27.jpg', 'photo28.jpg',
+];
 
 // Simple Error Boundary to catch 3D resource loading errors (like textures)
 class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean}> {
@@ -55,14 +66,8 @@ export default function App() {
   const [twoHandsDetected, setTwoHandsDetected] = useState(false);
   const [closestPhoto, setClosestPhoto] = useState<string | null>(null);
   const [manualPhotoIndex, setManualPhotoIndex] = useState<number | null>(null);
-  // 本地默认照片：从 pictures 目录读取，作为无上传时的展示来源
-  const localPhotos = useMemo<string[]>(() => {
-    const modules = import.meta.glob('./pictures/*.{png,jpg,jpeg,JPG,JPEG,webp,avif}', {
-      eager: true,
-      as: 'url',
-    }) as Record<string, string>;
-    return Object.values(modules);
-  }, []);
+  // 本地默认照片：从 public/images 读取固定文件名，交给 getPublicAsset 处理路径
+  const localPhotos = useMemo<string[]>(() => defaultPhotoFiles.map((name) => getPublicAsset(`images/${name}`)), []);
 
   // Check for share parameter in URL on mount
   useEffect(() => {
@@ -107,7 +112,7 @@ export default function App() {
     loadSharedPhotos();
   }, []);
   
-  // 若非分享模式且尚无照片，则默认载入本地 pictures 目录
+  // 若非分享模式且尚无照片，则默认载入本地 public/images 中的预置照片
   useEffect(() => {
     if (!isSharedView && uploadedPhotos.length === 0 && localPhotos.length > 0) {
       setUploadedPhotos(localPhotos);
@@ -165,9 +170,9 @@ export default function App() {
     setUploadedPhotos(photos);
   };
 
-  // 背景样式：使用 1.jpg，并叠加轻微渐变，避免干扰主体
+  // 背景样式：使用 public/images/6.jpg，并叠加轻微渐变，避免干扰主体
   const backgroundStyle = useMemo(() => ({
-    backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,20,10,0.35) 50%, rgba(0,0,0,0.55) 100%), url(${bg6})`,
+    backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,20,10,0.35) 50%, rgba(0,0,0,0.55) 100%), url(${getPublicAsset('images/6.jpg')})`,
     backgroundSize: 'cover',
     backgroundPosition: 'center center',
     backgroundRepeat: 'no-repeat',
