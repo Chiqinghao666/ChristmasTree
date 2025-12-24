@@ -57,7 +57,7 @@ export const GestureController: React.FC<GestureControllerProps> = ({
 
         handLandmarker = await HandLandmarker.createFromOptions(vision, {
           baseOptions: {
-            modelAssetPath: `/models/hand_landmarker.task`,
+            modelAssetPath: `${import.meta.env.BASE_URL}models/hand_landmarker.task`, // 使用 BASE_URL 兼容 GitHub Pages
             delegate: "GPU"
           },
           runningMode: "VIDEO",

@@ -6,7 +6,7 @@ import { Experience } from './components/Experience';
 import { UIOverlay } from './components/UIOverlay';
 import { GestureController } from './components/GestureController';
 import { TreeMode } from './types';
-const bg1 = '/backgrounds/6.jpg'; // 直接走静态路径，避免打包路径问题
+const bg1 = `${import.meta.env.BASE_URL}backgrounds/6.jpg`; // 使用 BASE_URL 兼容 GitHub Pages
 
 // Simple Error Boundary to catch 3D resource loading errors (like textures)
 class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean}> {
