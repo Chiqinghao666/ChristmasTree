@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState, useLayoutEffect } from 'react';
+import React, { useMemo, useRef, useLayoutEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { TreeMode } from '../types';
@@ -8,7 +8,8 @@ interface OrnamentsProps {
   count: number;
 }
 
-type OrnamentType = 'ball' | 'gift' | 'light';
+// 彩球权重最高，灯光次之，礼物盒最少；保留袜子/姜饼点缀
+type OrnamentType = 'ball' | 'gift' | 'light' | 'stocking' | 'gingerbread';
 
 interface InstanceData {
   chaosPos: THREE.Vector3;
@@ -21,65 +22,106 @@ interface InstanceData {
 }
 
 export const Ornaments: React.FC<OrnamentsProps> = ({ mode, count }) => {
-  // We use 3 separate InstancedMeshes for different geometries/materials to reduce draw calls
-  // but allow unique shapes.
   const ballsRef = useRef<THREE.InstancedMesh>(null);
   const giftsRef = useRef<THREE.InstancedMesh>(null);
+  const ribbonVRef = useRef<THREE.InstancedMesh>(null);
+  const ribbonHRef = useRef<THREE.InstancedMesh>(null);
   const lightsRef = useRef<THREE.InstancedMesh>(null);
+  const stockingsRef = useRef<THREE.InstancedMesh>(null);
+  const stockingCuffRef = useRef<THREE.InstancedMesh>(null);
+  const gingerRef = useRef<THREE.InstancedMesh>(null);
   
   const dummy = useMemo(() => new THREE.Object3D(), []);
+  const dummy2 = useMemo(() => new THREE.Object3D(), []);
 
-  // Generate data once
-  const { ballsData, giftsData, lightsData } = useMemo(() => {
+  const { ballsData, giftsData, lightsData, stockingsData, gingerData } = useMemo(() => {
     const _balls: InstanceData[] = [];
     const _gifts: InstanceData[] = [];
     const _lights: InstanceData[] = [];
+    const _stockings: InstanceData[] = [];
+    const _ginger: InstanceData[] = [];
 
-    const height = 11; // Slightly smaller than foliage
-    const maxRadius = 4.5;
+    const height = 11;
+    const maxRadius = 4.6;
     
-    // Luxury Colors
-    const gold = new THREE.Color("#D4AF37");
-    const red = new THREE.Color("#8B0000"); // Dark Velvet Red
-    const emerald = new THREE.Color("#004422");
-    const whiteGold = new THREE.Color("#F5E6BF");
-    
-    const palette = [gold, red, gold, whiteGold];
+    // 配色：祖母绿+金，辅以宝石红蓝
+    const gold = new THREE.Color("#dcb860");
+    const emerald = new THREE.Color("#0b5135");
+    const ruby = new THREE.Color("#8b1a1a");
+    const sapphire = new THREE.Color("#1b3f73");
+    const pearl = new THREE.Color("#f5e6bf");
+    const champagne = new THREE.Color("#e3c07a");
+    const jade = new THREE.Color("#2f6b3f");
+    const cobalt = new THREE.Color("#2b5fbf");
+    const blush = new THREE.Color("#b35a6b");
 
-    for (let i = 0; i < count; i++) {
-      const rnd = Math.random();
-      let type: OrnamentType = 'ball';
-      if (rnd > 0.8) type = 'gift';
-      if (rnd > 0.9) type = 'light'; // Less lights as geometry, more via bloom
+    const giftPalette = [gold, emerald, ruby, sapphire, pearl];
+    // 彩球权重提升，金/香槟/祖母绿为主
+    const ballPalette = [gold, champagne, champagne, gold, jade, jade, ruby, cobalt, pearl, blush, champagne, gold, emerald];
+    const lightPalette = [new THREE.Color("#ffd479"), new THREE.Color("#fff2d1"), new THREE.Color("#b6ffe9")];
 
-      // 1. Target Position (Spiral with heavy density at bottom)
-      // Use power function to bias distribution toward bottom (lower yNorm values)
-      const yNorm = Math.pow(Math.random(), 2.5); // Heavy concentration at bottom
-      const y = yNorm * height + 0.5;
-      const rScale = (1 - yNorm);
-      const theta = y * 10 + Math.random() * Math.PI * 2; // Wind around
-      
-      // Push ornaments slightly outside the foliage radius
-      const r = maxRadius * rScale + (Math.random() * 0.5);
-      
-      const targetPos = new THREE.Vector3(
+    const stockingRed = new THREE.Color("#c6252b");
+    const stockingGreen = new THREE.Color("#1f6b3a");
+    const gingerBrown = new THREE.Color("#b67a45");
+    const stockingPalette = [
+      stockingRed,
+      stockingRed.clone().offsetHSL(0.02, -0.05, 0.05),
+      stockingGreen,
+      stockingGreen.clone().offsetHSL(-0.03, 0.04, 0.02)
+    ];
+
+    const stockingsCount = Math.max(24, Math.floor(count * 0.14));
+    const gingerCount = Math.max(20, Math.floor(count * 0.11));
+
+    const makeTargetPos = (bias = 2.4) => {
+      const yNorm = Math.pow(Math.random(), bias);
+      const y = yNorm * height + 0.6;
+      const rScale = 1 - yNorm;
+      const theta = y * 10 + Math.random() * Math.PI * 2;
+      const r = maxRadius * rScale + Math.random() * 0.5;
+      return new THREE.Vector3(
         r * Math.cos(theta),
         y,
         r * Math.sin(theta)
       );
+    };
 
-      // 2. Chaos Position
+    const makeChaosPos = () => {
       const cR = 15 + Math.random() * 15;
       const cTheta = Math.random() * Math.PI * 2;
       const cPhi = Math.acos(2 * Math.random() - 1);
-      const chaosPos = new THREE.Vector3(
+      return new THREE.Vector3(
         cR * Math.sin(cPhi) * Math.cos(cTheta),
         cR * Math.sin(cPhi) * Math.sin(cTheta) + 5,
         cR * Math.cos(cPhi)
       );
+    };
 
-      const scale = type === 'light' ? 0.15 : (0.2 + Math.random() * 0.25);
-      const color = type === 'light' ? new THREE.Color("#FFFFAA") : palette[Math.floor(Math.random() * palette.length)];
+    // 分配：球 55%，灯 25%，礼物 20%
+    for (let i = 0; i < count; i++) {
+      const rnd = Math.random();
+      let type: OrnamentType = 'ball';
+      if (rnd < 0.25) type = 'light';
+      else if (rnd > 0.8) type = 'gift';
+
+      const targetPos = makeTargetPos(2.5);
+      const chaosPos = makeChaosPos();
+
+      const scale =
+        type === 'light'
+          ? 0.14 + Math.random() * 0.16
+          : type === 'gift'
+            ? 0.35 + Math.random() * 0.26
+            : 0.32 + Math.random() * 0.24;
+
+      let color: THREE.Color;
+      if (type === 'light') {
+        color = lightPalette[Math.floor(Math.random() * lightPalette.length)];
+      } else if (type === 'gift') {
+        color = giftPalette[Math.floor(Math.random() * giftPalette.length)];
+      } else {
+        color = ballPalette[Math.floor(Math.random() * ballPalette.length)];
+      }
 
       const data: InstanceData = {
         chaosPos,
@@ -87,7 +129,7 @@ export const Ornaments: React.FC<OrnamentsProps> = ({ mode, count }) => {
         type,
         color,
         scale,
-        speed: 0.5 + Math.random() * 1.5, // Random speed for physics feel
+        speed: 0.6 + Math.random() * 1.2,
         rotationOffset: new THREE.Euler(Math.random() * Math.PI, Math.random() * Math.PI, 0)
       };
 
@@ -96,142 +138,246 @@ export const Ornaments: React.FC<OrnamentsProps> = ({ mode, count }) => {
       else _lights.push(data);
     }
 
-    return { ballsData: _balls, giftsData: _gifts, lightsData: _lights };
+    // 袜子
+    for (let i = 0; i < stockingsCount; i++) {
+      const targetPos = makeTargetPos(2.1);
+      targetPos.x *= 1.05;
+      const chaosPos = new THREE.Vector3(
+        20 * (Math.random() - 0.5),
+        10 + Math.random() * 10,
+        20 * (Math.random() - 0.5)
+      );
+      _stockings.push({
+        chaosPos,
+        targetPos,
+        type: 'stocking',
+        color: stockingPalette[i % stockingPalette.length],
+        scale: 0.52 + Math.random() * 0.28,
+        speed: 0.7 + Math.random() * 1.0,
+        rotationOffset: new THREE.Euler(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI / 4)
+      });
+    }
+
+    // 姜饼人
+    for (let i = 0; i < gingerCount; i++) {
+      const targetPos = makeTargetPos(2.0);
+      targetPos.y += 0.2;
+      const chaosPos = new THREE.Vector3(
+        18 * (Math.random() - 0.5),
+        8 + Math.random() * 8,
+        18 * (Math.random() - 0.5)
+      );
+      _ginger.push({
+        chaosPos,
+        targetPos,
+        type: 'gingerbread',
+        color: gingerBrown.clone().offsetHSL(0, (Math.random() - 0.5) * 0.05, (Math.random() - 0.5) * 0.08),
+        scale: 0.48 + Math.random() * 0.24,
+        speed: 0.6 + Math.random() * 1.0,
+        rotationOffset: new THREE.Euler(Math.random() * Math.PI, Math.random() * Math.PI, 0)
+      });
+    }
+
+    return { ballsData: _balls, giftsData: _gifts, lightsData: _lights, stockingsData: _stockings, gingerData: _ginger };
   }, [count]);
 
   useLayoutEffect(() => {
-    // Set initial colors
     [
       { ref: ballsRef, data: ballsData },
       { ref: giftsRef, data: giftsData },
-      { ref: lightsRef, data: lightsData }
+      { ref: lightsRef, data: lightsData },
+      { ref: stockingsRef, data: stockingsData },
+      { ref: gingerRef, data: gingerData },
+      { ref: ribbonVRef, data: giftsData },
+      { ref: ribbonHRef, data: giftsData },
+      { ref: stockingCuffRef, data: stockingsData },
     ].forEach(({ ref, data }) => {
       if (ref.current) {
         data.forEach((d, i) => {
           ref.current!.setColorAt(i, d.color);
         });
-        ref.current.instanceColor!.needsUpdate = true;
+        if (ref.current.instanceColor) ref.current.instanceColor.needsUpdate = true;
       }
     });
-  }, [ballsData, giftsData, lightsData]);
+  }, [ballsData, giftsData, lightsData, stockingsData, gingerData]);
 
   useFrame((state, delta) => {
     const isFormed = mode === TreeMode.FORMED;
     const time = state.clock.elapsedTime;
 
-    // Helper to update a mesh ref
     const updateMesh = (ref: React.RefObject<THREE.InstancedMesh>, data: InstanceData[]) => {
       if (!ref.current) return;
 
       let needsUpdate = false;
 
       data.forEach((d, i) => {
-        // Interpolation Factor based on individual speed and global delta
-        // We use a simple approach: if formed, target is targetPos, else chaosPos
-        const dest = isFormed ? d.targetPos : d.chaosPos;
-        
-        // We actually want to lerp the CURRENT position to the DESTINATION
-        // But extracting current position from matrix is expensive every frame for all.
-        // Instead, we calculate "current" based on a virtual progress 0-1 driven by state.
-        
-        // To simulate "physics" (heavy/light), we don't store state per particle here (too complex for this snippet).
-        // Instead, we calculate position based on a time-dependent lerp factor.
-        
-        // However, a simple way to make it feel organic is:
-        // Position = Mix(Chaos, Target, SmoothStep(GlobalProgress * speed))
-        
-        // Let's use a sin wave derived from time for hover, but the main transition is driven by a hidden 'progress' value
-        // Since we don't have a global store for animation progress per particle, we approximate using the mode switch time.
-        // For a robust system, we'd use a spring library, but here we do manual lerping.
-
-        // Get current matrix position to lerp from? Too expensive.
-        // Let's assume a global transition variable `t` that goes 0->1 or 1->0.
-        // We will misuse the object's userdata or just calculate purely functional.
-        
-        // Functional approach:
-        // We need an accumulated value. Let's create a visual wobble.
-        
-        // NOTE: For true interactive physics, we'd use useSprings from react-spring/three, 
-        // but for 1000 instances, manual matrix manipulation is better.
-        // Here we will simply interpolate between the two static positions based on a "progress" variable
-        // that we track manually or approximate.
-        
-        // Let's read a custom progress from the dataset. 
-        // We'll augment the data object with a mutable `currentProgress` property in a closure if possible,
-        // but `data` is static.
-        
-        // Let's just use the `MathUtils.lerp` on the vectors directly inside the loop 
-        // by reading the matrix, lerping, writing back.
         ref.current!.getMatrixAt(i, dummy.matrix);
         dummy.matrix.decompose(dummy.position, dummy.quaternion, dummy.scale);
         
-        const step = delta * d.speed;
-        dummy.position.lerp(dest, step);
+        const dest = isFormed ? d.targetPos : d.chaosPos;
+        dummy.position.lerp(dest, delta * d.speed);
 
-        // Add wobble when formed
         if (isFormed && dummy.position.distanceTo(d.targetPos) < 0.5) {
           dummy.position.y += Math.sin(time * 2 + d.chaosPos.x) * 0.002;
         }
 
-        // Rotation
         if (d.type === 'gift') {
-           dummy.rotation.x += delta * 0.5;
-           dummy.rotation.y += delta * 0.2;
+          dummy.rotation.x += delta * 0.35;
+          dummy.rotation.y += delta * 0.15;
+        } else if (d.type === 'stocking') {
+          dummy.rotation.z = Math.sin(time * 0.8 + d.chaosPos.x) * 0.12;
+          dummy.rotation.y = d.rotationOffset.y;
+        } else if (d.type === 'gingerbread') {
+          dummy.rotation.y += delta * 0.25;
+          dummy.rotation.x = Math.sin(time * 0.5 + d.chaosPos.y) * 0.05;
         } else {
-           // Balls face out
-           dummy.lookAt(0, dummy.position.y, 0);
+          dummy.lookAt(0, dummy.position.y, 0);
         }
 
-        dummy.scale.setScalar(d.scale);
+        if (d.type === 'gift') {
+          dummy.scale.set(d.scale * 1.05, d.scale * 1.18, d.scale * 1.05);
+        } else {
+          dummy.scale.setScalar(d.scale);
+        }
+
         if (d.type === 'light') {
-           // Pulsate lights
-           const pulse = 1 + Math.sin(time * 5 + d.chaosPos.y) * 0.3;
-           dummy.scale.multiplyScalar(pulse);
+          const pulse = 1 + Math.sin(time * 5 + d.chaosPos.y) * 0.35;
+          dummy.scale.multiplyScalar(pulse);
+        } else if (d.type === 'stocking') {
+          const sway = 1 + Math.sin(time * 1.2 + d.chaosPos.x) * 0.05;
+          dummy.scale.multiplyScalar(sway);
         }
 
         dummy.updateMatrix();
         ref.current!.setMatrixAt(i, dummy.matrix);
+
+        // 礼物丝带
+        if (d.type === 'gift' && ribbonVRef.current && ribbonHRef.current) {
+          dummy2.position.copy(dummy.position);
+          dummy2.quaternion.copy(dummy.quaternion);
+          dummy2.scale.set(d.scale * 0.22, d.scale * 1.15, d.scale * 1.08);
+          dummy2.updateMatrix();
+          ribbonVRef.current.setMatrixAt(i, dummy2.matrix);
+
+          dummy2.scale.set(d.scale * 1.2, d.scale * 0.2, d.scale * 1.08);
+          dummy2.updateMatrix();
+          ribbonHRef.current.setMatrixAt(i, dummy2.matrix);
+        }
+
+        // 袜子袖口
+        if (d.type === 'stocking' && stockingCuffRef.current) {
+          dummy2.position.copy(dummy.position);
+          dummy2.position.y += d.scale * 0.45;
+          dummy2.quaternion.copy(dummy.quaternion);
+          dummy2.scale.set(d.scale * 0.9, d.scale * 0.35, d.scale * 0.7);
+          dummy2.updateMatrix();
+          stockingCuffRef.current.setMatrixAt(i, dummy2.matrix);
+        }
+
         needsUpdate = true;
       });
 
-      if (needsUpdate) ref.current.instanceMatrix.needsUpdate = true;
+      if (needsUpdate) {
+        ref.current.instanceMatrix.needsUpdate = true;
+        if (ref === giftsRef && ribbonVRef.current && ribbonHRef.current) {
+          ribbonVRef.current.instanceMatrix.needsUpdate = true;
+          ribbonHRef.current.instanceMatrix.needsUpdate = true;
+        }
+        if (ref === stockingsRef && stockingCuffRef.current) {
+          stockingCuffRef.current.instanceMatrix.needsUpdate = true;
+        }
+      }
     };
 
     updateMesh(ballsRef, ballsData);
     updateMesh(giftsRef, giftsData);
     updateMesh(lightsRef, lightsData);
+    updateMesh(stockingsRef, stockingsData);
+    updateMesh(gingerRef, gingerData);
   });
 
   return (
     <>
-      {/* Balls: High Gloss Gold/Red */}
+      {/* Balls: 高光彩球，金/香槟/祖母绿为主 */}
       <instancedMesh ref={ballsRef} args={[undefined, undefined, ballsData.length]}>
-        <sphereGeometry args={[1, 32, 32]} />
+        <sphereGeometry args={[1.05, 32, 32]} />
         <meshStandardMaterial 
-          roughness={0.1} 
-          metalness={0.9} 
-          envMapIntensity={1.5}
+          roughness={0.16} 
+          metalness={0.8} 
+          envMapIntensity={1.35}
         />
       </instancedMesh>
 
-      {/* Gifts: Cubes with ribbons (simplified as cubes) */}
+      {/* Gifts: 数量较少但更厚重 */}
       <instancedMesh ref={giftsRef} args={[undefined, undefined, giftsData.length]}>
         <boxGeometry args={[1, 1, 1]} />
         <meshStandardMaterial 
-          roughness={0.3} 
-          metalness={0.5} 
-          color="#white" // Tinted by instance color
+          roughness={0.2} 
+          metalness={0.75} 
+          envMapIntensity={1.4}
+          clearcoat={0.5}
+          clearcoatRoughness={0.22}
+          color="#ffffff" // 实际由实例颜色控制
+        />
+      </instancedMesh>
+      {/* Gift Ribbons: 纵向与横向丝带 */}
+      <instancedMesh ref={ribbonVRef} args={[undefined, undefined, giftsData.length]}>
+        <boxGeometry args={[0.2, 1.3, 1.1]} />
+        <meshStandardMaterial 
+          roughness={0.12} 
+          metalness={0.92} 
+          envMapIntensity={1.6}
+          color="#f6d87a"
+        />
+      </instancedMesh>
+      <instancedMesh ref={ribbonHRef} args={[undefined, undefined, giftsData.length]}>
+        <boxGeometry args={[1.3, 0.2, 1.1]} />
+        <meshStandardMaterial 
+          roughness={0.12} 
+          metalness={0.92} 
+          envMapIntensity={1.6}
+          color="#f6d87a"
         />
       </instancedMesh>
 
-      {/* Lights: Emissive small spheres */}
+      {/* Lights: 次重，依靠辉光 */}
       <instancedMesh ref={lightsRef} args={[undefined, undefined, lightsData.length]}>
-        <sphereGeometry args={[1, 8, 8]} />
+        <sphereGeometry args={[1, 12, 12]} />
         <meshStandardMaterial 
           emissive="white"
-          emissiveIntensity={2}
+          emissiveIntensity={2.6}
           toneMapped={false}
-          color="white" // Tinted by instance color (yellowish)
+          color="white"
+        />
+      </instancedMesh>
+
+      {/* Stockings: 红/绿袜子 + 白色袖口 */}
+      <instancedMesh ref={stockingsRef} args={[undefined, undefined, stockingsData.length]}>
+        <boxGeometry args={[0.42, 1.05, 0.32]} />
+        <meshStandardMaterial 
+          roughness={0.4} 
+          metalness={0.15} 
+          color="#d13b3b"
+        />
+      </instancedMesh>
+      <instancedMesh ref={stockingCuffRef} args={[undefined, undefined, stockingsData.length]}>
+        <boxGeometry args={[0.48, 0.32, 0.4]} />
+        <meshStandardMaterial 
+          roughness={0.35} 
+          metalness={0.1} 
+          color="#f8f4ec"
+        />
+      </instancedMesh>
+
+      {/* Gingerbread: 带微弱糖霜发光 */}
+      <instancedMesh ref={gingerRef} args={[undefined, undefined, gingerData.length]}>
+        <boxGeometry args={[0.6, 0.85, 0.18]} />
+        <meshStandardMaterial 
+          roughness={0.6} 
+          metalness={0.08} 
+          color="#b67a45"
+          emissive="#f5e6bf"
+          emissiveIntensity={0.25}
         />
       </instancedMesh>
     </>

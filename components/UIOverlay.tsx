@@ -18,6 +18,10 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({ mode, onToggle, onPhotosUp
   const [shareError, setShareError] = useState<string>('');
   const [copied, setCopied] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>('');
+  // 上传入口暂时隐藏，后续可通过切换此标记恢复
+  const showUpload = false;
+  // 右下角分享/上传区域隐藏（按需恢复）
+  const showActions = false;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -222,11 +226,12 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({ mode, onToggle, onPhotosUp
       {/* Header */}
       <header className="absolute top-8 left-1/2 transform -translate-x-1/2 flex flex-col items-center">
         <h1 className="text-4xl md:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#D4AF37] via-[#F5E6BF] to-[#D4AF37] font-serif drop-shadow-lg tracking-wider text-center">
-          Merry Christmas
+          Happy Anniversary
         </h1>
       </header>
 
       {/* Right Bottom Action Area */}
+      {showActions && (
       <div className="absolute bottom-8 right-8 flex flex-col items-end gap-4 pointer-events-auto">
         
         {/* Hidden file input */}
@@ -255,7 +260,7 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({ mode, onToggle, onPhotosUp
         {!isSharedView && (
           <>
             {/* Upload Button - Show when no photos */}
-            {!hasPhotos && (
+            {showUpload && !hasPhotos && (
               <button
                 onClick={handleUploadClick}
                 className="group px-6 py-3 border-2 border-[#D4AF37] bg-black/70 backdrop-blur-md overflow-hidden transition-all duration-500 hover:shadow-[0_0_30px_#D4AF37] hover:border-[#fff] hover:bg-[#D4AF37]/20"
@@ -312,6 +317,7 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({ mode, onToggle, onPhotosUp
           </>
         )}
       </div>
+      )}
 
       {/* Decorative Corners */}
       <div className="absolute top-8 left-8 w-16 h-16 border-t-2 border-l-2 border-[#D4AF37] opacity-50"></div>

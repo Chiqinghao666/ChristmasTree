@@ -1,5 +1,6 @@
 {
   "name": "grand-luxury-interactive-christmas-tree",
+  "homepage": "https://Chiqinghao666.github.io/ChristmasTree",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,7 +10,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "download-model": "node scripts/download-model.js",
-    "postinstall": "npm run download-model"
+    "postinstall": "npm run download-model",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.952.0",
@@ -26,6 +29,7 @@
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "gh-pages": "^6.3.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }

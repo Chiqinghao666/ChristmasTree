@@ -1,11 +1,12 @@
 
-import React, { useState, Suspense, useEffect } from 'react';
+import React, { useState, Suspense, useEffect, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Loader } from '@react-three/drei';
 import { Experience } from './components/Experience';
 import { UIOverlay } from './components/UIOverlay';
 import { GestureController } from './components/GestureController';
 import { TreeMode } from './types';
+const bg1 = '/backgrounds/6.jpg'; // 直接走静态路径，避免打包路径问题
 
 // Simple Error Boundary to catch 3D resource loading errors (like textures)
 class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean}> {
@@ -53,6 +54,15 @@ export default function App() {
   const [isSharedView, setIsSharedView] = useState(false);
   const [twoHandsDetected, setTwoHandsDetected] = useState(false);
   const [closestPhoto, setClosestPhoto] = useState<string | null>(null);
+  const [manualPhotoIndex, setManualPhotoIndex] = useState<number | null>(null);
+  // 本地默认照片：从 pictures 目录读取，作为无上传时的展示来源
+  const localPhotos = useMemo<string[]>(() => {
+    const modules = import.meta.glob('./pictures/*.{png,jpg,jpeg,JPG,JPEG,webp,avif}', {
+      eager: true,
+      as: 'url',
+    }) as Record<string, string>;
+    return Object.values(modules);
+  }, []);
 
   // Check for share parameter in URL on mount
   useEffect(() => {
@@ -96,10 +106,32 @@ export default function App() {
 
     loadSharedPhotos();
   }, []);
+  
+  // 若非分享模式且尚无照片，则默认载入本地 pictures 目录
+  useEffect(() => {
+    if (!isSharedView && uploadedPhotos.length === 0 && localPhotos.length > 0) {
+      setUploadedPhotos(localPhotos);
+    }
+  }, [isSharedView, uploadedPhotos.length, localPhotos]);
+  
+  // 当双手离开时，关闭大图并重置手动索引
+  useEffect(() => {
+    if (!twoHandsDetected) {
+      setClosestPhoto(null);
+      setManualPhotoIndex(null);
+    }
+  }, [twoHandsDetected]);
 
   const toggleMode = () => {
     setMode((prev) => (prev === TreeMode.FORMED ? TreeMode.CHAOS : TreeMode.FORMED));
   };
+
+  // 若照片列表变化，确保索引有效
+  useEffect(() => {
+    if (manualPhotoIndex !== null && manualPhotoIndex >= uploadedPhotos.length) {
+      setManualPhotoIndex(uploadedPhotos.length > 0 ? 0 : null);
+    }
+  }, [uploadedPhotos.length, manualPhotoIndex]);
 
   const handleHandPosition = (x: number, y: number, detected: boolean) => {
     setHandPosition({ x, y, detected });
@@ -109,25 +141,61 @@ export default function App() {
     setTwoHandsDetected(detected);
   };
 
+  // 第二只手左右滑动切换大图
+  const handleSwipe = (direction: 'left' | 'right') => {
+    if (uploadedPhotos.length === 0) return;
+    setManualPhotoIndex((prev) => {
+      const current = prev ?? 0;
+      const max = uploadedPhotos.length;
+      if (direction === 'right') return (current + 1) % max;
+      return (current - 1 + max) % max;
+    });
+  };
+
   const handleClosestPhotoChange = (photoUrl: string | null) => {
     setClosestPhoto(photoUrl);
+  };
+
+  // 记录 Polaroids 内部自动选中的索引，保持与大图同步
+  const handleSelectedIndexChange = (index: number) => {
+    setManualPhotoIndex(index);
   };
 
   const handlePhotosUpload = (photos: string[]) => {
     setUploadedPhotos(photos);
   };
 
+  // 背景样式：使用 1.jpg，并叠加轻微渐变，避免干扰主体
+  const backgroundStyle = useMemo(() => ({
+    backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,20,10,0.35) 50%, rgba(0,0,0,0.55) 100%), url(${bg1})`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center center',
+    backgroundRepeat: 'no-repeat',
+    backgroundColor: '#000' // fallback
+  }), []);
+
   return (
-    <div className="w-full h-screen relative bg-gradient-to-b from-black via-[#001a0d] to-[#0a2f1e]">
+    <div className="w-full h-screen relative overflow-hidden" style={backgroundStyle}>
+      {/* 背景遮罩，确保树体清晰可见 */}
+      <div className="absolute inset-0 bg-black/10 pointer-events-none" />
       <ErrorBoundary>
         <Canvas
           dpr={[1, 2]}
           camera={{ position: [0, 4, 20], fov: 45 }}
-          gl={{ antialias: false, stencil: false, alpha: false }}
+          gl={{ antialias: false, stencil: false, alpha: true }}
+          style={{ background: 'transparent' }}
           shadows
         >
           <Suspense fallback={null}>
-            <Experience mode={mode} handPosition={handPosition} uploadedPhotos={uploadedPhotos} twoHandsDetected={twoHandsDetected} onClosestPhotoChange={handleClosestPhotoChange} />
+            <Experience 
+              mode={mode} 
+              handPosition={handPosition} 
+              uploadedPhotos={uploadedPhotos} 
+              twoHandsDetected={twoHandsDetected} 
+              onClosestPhotoChange={handleClosestPhotoChange}
+              selectedPhotoIndex={manualPhotoIndex ?? undefined}
+              onSelectedPhotoIndexChange={handleSelectedIndexChange}
+            />
           </Suspense>
         </Canvas>
       </ErrorBoundary>
@@ -158,7 +226,13 @@ export default function App() {
       )}
       
       {/* Gesture Control Module */}
-      <GestureController currentMode={mode} onModeChange={setMode} onHandPosition={handleHandPosition} onTwoHandsDetected={handleTwoHandsDetected} />
+      <GestureController 
+        currentMode={mode} 
+        onModeChange={setMode} 
+        onHandPosition={handleHandPosition} 
+        onTwoHandsDetected={handleTwoHandsDetected} 
+        onSwipe={handleSwipe}
+      />
       
       {/* Photo Overlay - Shows when two hands detected */}
       {closestPhoto && (

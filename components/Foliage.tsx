@@ -8,6 +8,7 @@ interface FoliageProps {
   count: number;
 }
 
+// 叶片 shader：奢华绿金配色，带轻微风动
 const vertexShader = `
   uniform float uTime;
   uniform float uProgress;
@@ -42,20 +43,22 @@ const vertexShader = `
 
     vec4 mvPosition = modelViewMatrix * vec4(newPos, 1.0);
     
-    // Size attenuation
-    gl_PointSize = (4.0 * aRandom + 2.0) * (20.0 / -mvPosition.z);
+    // Size attenuation：略放大点尺寸让树冠更饱满
+    gl_PointSize = (4.5 * aRandom + 2.5) * (22.0 / -mvPosition.z);
     gl_Position = projectionMatrix * mvPosition;
 
-    // Color logic: Mix between Chaos Gold and Formed Emerald
-    vec3 goldColor = vec3(1.0, 0.84, 0.0);
-    vec3 emeraldColor = vec3(0.0, 0.4, 0.1);
-    vec3 brightGreen = vec3(0.1, 0.8, 0.2);
+    // Color logic: 深祖母绿为底，金色高光提亮
+    vec3 mutedGold = vec3(0.95, 0.80, 0.28);
+    vec3 deepGreen = vec3(0.02, 0.28, 0.07);
+    vec3 tipGreen = vec3(0.14, 0.72, 0.20);
+    float heightFactor = clamp(newPos.y / 12.0, 0.0, 1.0); // 越高越亮
     
     // Sparkle effect
     float sparkle = sin(uTime * 5.0 + aRandom * 100.0);
-    vec3 finalGreen = mix(emeraldColor, brightGreen, aRandom * 0.3);
+    vec3 finalGreen = mix(deepGreen, tipGreen, aRandom * 0.6 + heightFactor * 0.35);
+    vec3 goldAccent = mix(finalGreen, mutedGold, 0.18 + heightFactor * 0.25); // 顶部更金
     
-    vColor = mix(goldColor, finalGreen, easedProgress);
+    vColor = mix(goldAccent, finalGreen, 0.3); // 保留绿意，但有金色辉光
     
     // Add sparkle to the tips
     if (sparkle > 0.9) {

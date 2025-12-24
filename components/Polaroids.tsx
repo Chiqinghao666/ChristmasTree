@@ -29,6 +29,9 @@ interface PolaroidsProps {
   uploadedPhotos: string[];
   twoHandsDetected: boolean;
   onClosestPhotoChange?: (photoUrl: string | null) => void;
+  // 可选：外部控制当前选中照片（用于双手滑动切换大图）
+  selectedIndex?: number;
+  onSelectedIndexChange?: (index: number) => void;
 }
 
 interface PhotoData {
@@ -178,7 +181,7 @@ const PolaroidItem: React.FC<{ data: PhotoData; mode: TreeMode; index: number }>
   );
 };
 
-export const Polaroids: React.FC<PolaroidsProps> = ({ mode, uploadedPhotos, twoHandsDetected, onClosestPhotoChange }) => {
+export const Polaroids: React.FC<PolaroidsProps> = ({ mode, uploadedPhotos, twoHandsDetected, onClosestPhotoChange, selectedIndex, onSelectedIndexChange }) => {
   const groupRef = useRef<THREE.Group>(null);
   const [closestPhotoIndex, setClosestPhotoIndex] = React.useState<number>(0);
 
@@ -240,35 +243,53 @@ export const Polaroids: React.FC<PolaroidsProps> = ({ mode, uploadedPhotos, twoH
     return data;
   }, [uploadedPhotos]);
 
+  // 外部指定选中索引时同步内部状态
+  useEffect(() => {
+    if (typeof selectedIndex === 'number' && uploadedPhotos[selectedIndex]) {
+      setClosestPhotoIndex(selectedIndex);
+      onClosestPhotoChange?.(uploadedPhotos[selectedIndex]);
+    }
+  }, [selectedIndex, uploadedPhotos, onClosestPhotoChange]);
+
   // Update closest photo every frame when two hands are detected
   useFrame((state) => {
     if (twoHandsDetected && groupRef.current && photoData.length > 0) {
-      // Get camera position in world coordinates
-      const cameraPos = state.camera.position.clone();
-      
-      let minDistance = Infinity;
-      let closestIndex = 0;
-      
-      // Check each photo's actual world position
-      groupRef.current.children.forEach((child, i) => {
-        if (i < photoData.length) {
-          // Get world position of the photo
-          const worldPos = new THREE.Vector3();
-          child.getWorldPosition(worldPos);
-          
-          const distance = worldPos.distanceTo(cameraPos);
-          if (distance < minDistance) {
-            minDistance = distance;
-            closestIndex = i;
-          }
+      if (typeof selectedIndex === 'number') {
+        // 若外部已指定，直接使用
+        const idx = Math.min(Math.max(selectedIndex, 0), photoData.length - 1);
+        if (idx !== closestPhotoIndex) {
+          setClosestPhotoIndex(idx);
         }
-      });
-      
-      setClosestPhotoIndex(closestIndex);
-      
-      // Notify parent component about the closest photo
-      if (onClosestPhotoChange) {
-        onClosestPhotoChange(uploadedPhotos[closestIndex]);
+        onClosestPhotoChange?.(uploadedPhotos[idx]);
+      } else {
+        // 原有最近距离选取
+        const cameraPos = state.camera.position.clone();
+        
+        let minDistance = Infinity;
+        let closestIndex = 0;
+        
+        // Check each photo's actual world position
+        groupRef.current.children.forEach((child, i) => {
+          if (i < photoData.length) {
+            const worldPos = new THREE.Vector3();
+            child.getWorldPosition(worldPos);
+            
+            const distance = worldPos.distanceTo(cameraPos);
+            if (distance < minDistance) {
+              minDistance = distance;
+              closestIndex = i;
+            }
+          }
+        });
+        
+        if (closestIndex !== closestPhotoIndex) {
+          setClosestPhotoIndex(closestIndex);
+          onSelectedIndexChange?.(closestIndex);
+        }
+        
+        if (onClosestPhotoChange) {
+          onClosestPhotoChange(uploadedPhotos[closestIndex]);
+        }
       }
     } else if (onClosestPhotoChange) {
       // Clear the overlay when two hands are not detected
