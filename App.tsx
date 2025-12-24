@@ -12,8 +12,8 @@ const getPublicAsset = (path: string) => `${import.meta.env.BASE_URL}${path}`;
 
 // 默认本地照片（已放入 public/images，下方按文件名列出）
 const defaultPhotoFiles = [
-  'photo01.JPG', 'photo02.JPG', 'photo03.JPG', 'photo04.JPG', 'photo05.JPG', 'photo06.JPG',
-  'photo07.JPG', 'photo08.JPG', 'photo09.JPG', 'photo10.jpg', 'photo11.jpg', 'photo12.jpg',
+  'photo01.jpg', 'photo02.jpg', 'photo03.jpg', 'photo04.jpg', 'photo05.jpg', 'photo06.jpg',
+  'photo07.jpg', 'photo08.jpg', 'photo09.jpg', 'photo10.jpg', 'photo11.jpg', 'photo12.jpg',
   'photo13.jpg', 'photo14.jpg', 'photo15.jpg', 'photo16.jpg', 'photo17.jpg', 'photo18.jpg',
   'photo19.jpg', 'photo20.jpg', 'photo21.jpg', 'photo22.jpg', 'photo23.jpg', 'photo24.jpg',
   'photo25.jpg', 'photo26.jpg', 'photo27.jpg', 'photo28.jpg',
