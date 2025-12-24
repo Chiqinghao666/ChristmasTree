@@ -1,6 +1,6 @@
 
 import React, { useRef } from 'react';
-import { Environment, OrbitControls } from '@react-three/drei';
+import { OrbitControls } from '@react-three/drei';
 import { EffectComposer, Bloom, Vignette, Noise } from '@react-three/postprocessing';
 import { BlendFunction } from 'postprocessing';
 import { useFrame } from '@react-three/fiber';
@@ -88,8 +88,6 @@ export const Experience: React.FC<ExperienceProps> = ({ mode, handPosition, uplo
       />
 
       {/* Lighting 奢华祖母绿+金色辉光 */}
-      <Environment preset="lobby" background={false} blur={0.65} />
-      
       <ambientLight intensity={0.28} color="#0b2e1c" />
       <spotLight 
         position={[10, 20, 10]} 
