@@ -6,7 +6,7 @@ import { Experience } from './components/Experience';
 import { UIOverlay } from './components/UIOverlay';
 import { GestureController } from './components/GestureController';
 import { TreeMode } from './types';
-const bg1 = `${import.meta.env.BASE_URL}backgrounds/6.jpg`; // 使用 BASE_URL 兼容 GitHub Pages
+import bg6 from './backgrounds/6.jpg'; // 直接 import 静态资源，打包时自动处理路径
 
 // Simple Error Boundary to catch 3D resource loading errors (like textures)
 class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean}> {
@@ -167,7 +167,7 @@ export default function App() {
 
   // 背景样式：使用 1.jpg，并叠加轻微渐变，避免干扰主体
   const backgroundStyle = useMemo(() => ({
-    backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,20,10,0.35) 50%, rgba(0,0,0,0.55) 100%), url(${bg1})`,
+    backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,20,10,0.35) 50%, rgba(0,0,0,0.55) 100%), url(${bg6})`,
     backgroundSize: 'cover',
     backgroundPosition: 'center center',
     backgroundRepeat: 'no-repeat',
