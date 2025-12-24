@@ -22,7 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-*.jpg
+# 允许 public/images 中的资源被提交
+!public/images/*.jpg
+!public/images/*.jpeg
+!public/images/*.png
+!public/images/*.webp
+!public/images/*.avif
 
 .vercel
 .env*.local
